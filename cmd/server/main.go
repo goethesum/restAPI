@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/goethesum/restAPI/internal/comment"
 	"github.com/goethesum/restAPI/internal/database"
 	transportHTTP "github.com/goethesum/restAPI/internal/transport/http"
 )
@@ -18,12 +19,14 @@ func (app *App) Run() error {
 	fmt.Println("Setting up our app")
 
 	var err error
-	_, err = database.NewDatabase()
+	db, err := database.NewDatabase()
 	if err != nil {
 		return err
 	}
 
-	handler := transportHTTP.NewHandler()
+	commentService := comment.NewService(db)
+
+	handler := transportHTTP.NewHandler(commentService)
 	handler.SetupRoutes()
 
 	if err := http.ListenAndServe(":8080", handler.Router); err != nil {
