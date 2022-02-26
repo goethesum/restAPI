@@ -3,7 +3,9 @@
 package test
 
 import (
-	"github.com/go-resty/v2"
+	"fmt"
+	"github.com/go-resty/resty/v2"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -16,5 +18,5 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Fail()
 	}
 
-	fmt.Println(resp.StatusCode())
+	assert.Equal(t, 200, resp.StatusCode())
 }
