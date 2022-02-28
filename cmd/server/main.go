@@ -7,16 +7,24 @@ import (
 	"github.com/goethesum/restAPI/internal/comment"
 	"github.com/goethesum/restAPI/internal/database"
 	transportHTTP "github.com/goethesum/restAPI/internal/transport/http"
+
+	log "github.com/siruspen/logrus"
 )
 
-// App -contains things like pointers
-// to DB connections
+// App - contain aplication information
 type App struct {
+	Name    string
+	Version string
 }
 
 // Run - sets up our app
 func (app *App) Run() error {
-	fmt.Println("Setting up our app")
+	log.SetFormatter(&log.JSONFormatter{})
+	log.WithFields(
+		log.Fields{
+			"AppName":    app.Name,
+			"AppVersion": app.Version,
+		}).Info("Setting up application")
 
 	var err error
 	db, err := database.NewDatabase()
@@ -35,15 +43,18 @@ func (app *App) Run() error {
 	if err := http.ListenAndServe(":8080", handler.Router); err != nil {
 		return err
 	}
-	fmt.Println("Failed to set up server")
+	log.Error("Failed to set up server")
 	return nil
 }
 
 func main() {
 	fmt.Println("behold")
-	app := App{}
+	app := App{
+		Name:    "Rest-API",
+		Version: "1.0.0",
+	}
 	if err := app.Run(); err != nil {
-		fmt.Println("Error starting up REST API")
-		fmt.Println(err)
+		log.Error("Error starting up REST API")
+		log.Fatal(err)
 	}
 }
