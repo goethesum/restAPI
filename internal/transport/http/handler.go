@@ -3,9 +3,12 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/goethesum/restAPI/internal/comment"
+	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	log "github.com/siruspen/logrus"
 )
@@ -49,8 +52,50 @@ func BasicAuth(original func(w http.ResponseWriter, r *http.Request)) func(w htt
 		if user == "admin" && pass == "password" && ok {
 			original(w, r)
 		} else {
-			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 			sendErrorResponse(w, "not authorized", errors.New("not authorized"))
+			return
+		}
+	}
+}
+
+func validateTokent(accessToken string) bool {
+	var mySigningKey = []byte("missionimpossible")
+	token, err := jwt.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("there has been an error")
+		}
+		return mySigningKey, nil
+	})
+
+	if err != nil {
+		return false
+	}
+	return token.Valid
+}
+
+// JWTAuth - a decorator function for jwt validation for endpoints
+func JWTAuth(original func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Info("jwt auth endpoint hit")
+		authHeader := r.Header["Authorization"]
+		if authHeader == nil {
+			sendErrorResponse(w, "not authorized", errors.New("not authorized"))
+			return
+		}
+
+		// Bearer jwt-token
+
+		authHeaderParts := strings.Split(authHeader[0], " ")
+		if len(authHeaderParts) != 2 || strings.ToLower(authHeaderParts[0]) != "bearer" {
+			sendErrorResponse(w, "not authorized", errors.New("not authorized"))
+			return
+		}
+
+		if validateTokent(authHeaderParts[1]) {
+			original(w, r)
+		} else {
+			sendErrorResponse(w, "not authorized", errors.New("not authorized"))
+			return
 		}
 	}
 }
@@ -62,7 +107,7 @@ func (h *Handler) SetupRoutes() {
 	h.Router.Use(LoggingMiddleware)
 
 	h.Router.HandleFunc("/api/comment", h.GetAllComments).Methods("GET")
-	h.Router.HandleFunc("/api/comment", BasicAuth(h.PostComment)).Methods("POST")
+	h.Router.HandleFunc("/api/comment", JWTAuth(h.PostComment)).Methods("POST")
 	h.Router.HandleFunc("/api/comment/{id}", h.GetComment).Methods("GET")
 	h.Router.HandleFunc("/api/comment/{id}", BasicAuth(h.UpdateComment)).Methods("PUT")
 	h.Router.HandleFunc("/api/comment/{id}", BasicAuth(h.DeleteComment)).Methods("DELETE")
@@ -83,9 +128,9 @@ func sendOkResponse(w http.ResponseWriter, resp interface{}) error {
 }
 
 func sendErrorResponse(w http.ResponseWriter, message string, err error) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusInternalServerError)
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if err := json.NewEncoder(w).Encode(Response{Message: message, Error: err.Error()}); err != nil {
-		panic(err)
+		log.Error(err)
 	}
 }
